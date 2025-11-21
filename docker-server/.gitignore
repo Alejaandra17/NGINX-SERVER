@@ -1,0 +1,40 @@
+# Docker Specifics
+
+# Environment variables 
+.env
+.env.local
+.env.*
+
+# Docker Compose local overrides
+docker-compose.override.yml
+
+# Build directories 
+build/
+dist/
+
+
+# Security & Certificates
+
+*.pem
+*.key
+*.crt
+*.csr
+/conf/ssl/
+
+
+# Logs & Data
+
+*.log
+logs/
+log/
+*_data/
+data/
+
+
+# OS & IDE Files (Standard)
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
