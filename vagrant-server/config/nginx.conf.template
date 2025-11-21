@@ -1,0 +1,15 @@
+server {
+    listen 80;
+    listen [::]:80;
+    
+    # Root directory for the website 
+    root /var/www/%%WEB_HOSTNAME%%/html;
+    
+    index index.html index.htm index.nginx-debian.html;
+    
+    server_name %%WEB_HOSTNAME%%;
+    
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
