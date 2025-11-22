@@ -123,7 +123,7 @@ You must add the following line, substituting 192.168.56.101 with your Virtual M
 ```bash
 192.168.56.101 nginx.ieszaidinvergeles.org
 ```
-![alt text](image.png)
+![alt text](assets/image.png)
 
 Option B: Use the nip.io Service
 Modify the server_name directive in your Nginx configuration file (/etc/nginx/sites-available/nginx.ieszaidinvergeles.org) to look like this:
@@ -131,14 +131,14 @@ Modify the server_name directive in your Nginx configuration file (/etc/nginx/si
 ```bash
 server_name 192-168-56-101.nginx.ieszaidinvergeles.org.nip.io;
 ```
-![alt text](image-1.png)
+![alt text](assets/image-1.png)
 ---
 
 # 6. Access Verification
 
 We will check for correct operation of the logs. Once you have tried to access http://nginx.ieszaidinvergeles.org, verify that requests are being correctly registered in the log files, including both successful and failed ones.
 
-![alt text](image-2.png)
+![alt text](assets/image-2.png)
 
 ## Request Log (access.log)
 This file records every request sent to your web server, unless Nginx is configured to do otherwise. Here you will see successful responses.
@@ -146,7 +146,7 @@ This file records every request sent to your web server, unless Nginx is configu
 ```bash
 sudo nano /var/log/nginx/access.log
 ```
-![alt text](image-3.png)
+![alt text](assets/image-3.png)
 
 ## Error Log (error.log)
 Any Nginx errors (configuration, permissions, or internal 403/500 errors) will be settled in this log.
@@ -154,7 +154,7 @@ Any Nginx errors (configuration, permissions, or internal 403/500 errors) will b
 ```Bash
 sudo nano /var/log/nginx/error.log
 ```
-![alt text](image-4.png)
+![alt text](assets/image-4.png)
 
 -------
 
@@ -276,7 +276,7 @@ To check that the container is running:
 ```bash
 docker ps
 ```
-![alt text](image-5.png)
+![alt text](assets/image-5.png)
 
 To view the container logs:
 
@@ -302,7 +302,7 @@ http://localhost
 http://192.168.56.101:8080
 ```
 
-![alt text](image-6.png)
+![alt text](assets/image-6.png)
 
 ---
 
@@ -319,7 +319,7 @@ You must add the following line, pointing to the local IP address:
 ```bash
 127.0.0.1 nginx.ieszaidinvergeles
 ```
-![alt text](image-7.png)
+![alt text](assets/image-7.png)
 
 # 6. Access Verification
 
@@ -331,7 +331,7 @@ This file records every request sent to your web server, unless Nginx is configu
 ```bash
 sudo nano /var/log/nginx/access.log
 ```
-![alt text](image-3.png)
+![alt text](assets/image-3.png)
 
 ## Error Log (error.log)
 Any Nginx errors (configuration, permissions, or internal 403/500 errors) will be settled in this log.
