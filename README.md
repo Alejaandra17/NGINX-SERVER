@@ -302,7 +302,7 @@ http://localhost
 http://192.168.56.101:8080
 ```
 
-![alt text](assets/image-6.png)
+![alt text](assets/image-8.png)
 
 ---
 
