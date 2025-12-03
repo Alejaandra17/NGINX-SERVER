@@ -12,6 +12,7 @@ docker run -d \
   -p $HOST_PORT:80 \
   -v "$(pwd)/html":/usr/share/nginx/html \
   -v "$(pwd)/conf/nginx.conf":/etc/nginx/conf.d/default.conf \
+  -v "$(pwd)/config/conf/.htpasswd":/etc/nginx/.htpasswd \
   nginx:latest
 
 echo "Done. Access at http://localhost:$HOST_PORT"
