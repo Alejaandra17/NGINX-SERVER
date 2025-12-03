@@ -23,8 +23,7 @@ echo "Setting up server $NS_HOSTNAME ($SERVER_IP)"
 
 apt-get update
 # Added nginx and git
-apt-get install -y bind9 bind9utils bind9-doc vsftpd openssl nginx git
-
+apt-get install -y bind9 bind9utils bind9-doc vsftpd openssl nginx git ufw
 # Use IPv4 for BIND9
 echo 'OPTIONS="-u bind -4"' > /etc/default/named
 
@@ -174,22 +173,37 @@ rm -rf /tmp/repo
 chown -R www-data:www-data /var/www/$WEB_HOSTNAME
 chmod -R 755 /var/www/$WEB_HOSTNAME
 
+# 5.1. Execute the script to generate the certs located in /vagrant/config/certs.sh
+echo "--- Calling external script for SSL generation ---"
+chmod +x /vagrant/config/certs.sh
+/vagrant/config/certs.sh "$WEB_HOSTNAME"
 
+# 5.2. USER AND PASSWORD CONFIGURATION
+echo "--- Generating users and passwords for Nginx ---"
 echo -n "mario:" > /etc/nginx/.htpasswd
 openssl passwd -apr1 'mario' >> /etc/nginx/.htpasswd
 echo -n "alejandra:" >> /etc/nginx/.htpasswd
 openssl passwd -apr1 'alejandra' >> /etc/nginx/.htpasswd
 chown www-data:www-data /etc/nginx/.htpasswd
 chmod 640 /etc/nginx/.htpasswd
+chown www-data:www-data /etc/nginx/.htpasswd
+chmod 640 /etc/nginx/.htpasswd
 
-
+# 5.3 Configure Server 
 cat > /etc/nginx/sites-available/$WEB_HOSTNAME <<EOF
 server {
     listen 80;
-    listen [::]:80;
+    listen 443 ssl;
+
     root $WEB_ROOT;
-    index index.html index.htm;
+    index index.html index.htm index.nginx-debian.html;
     server_name $WEB_HOSTNAME;
+
+    # SSL Config 
+    ssl_certificate /etc/ssl/certs/$WEB_HOSTNAME.crt;
+    ssl_certificate_key /etc/ssl/private/$WEB_HOSTNAME.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
 
     location / {
         satisfy all;
@@ -198,7 +212,7 @@ server {
         allow 127.0.0.1;        
         deny all;               
 
-        auth_basic "Restricted Area";
+        auth_basic "Restricted Area SSL";
         auth_basic_user_file /etc/nginx/.htpasswd;
 
         try_files \$uri \$uri/ =404;
@@ -210,6 +224,10 @@ ln -sf /etc/nginx/sites-available/$WEB_HOSTNAME /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 systemctl restart nginx
 
+# 6. FIREWALL
+ufw allow ssh
+ufw allow 'Nginx Full'
+ufw --force enable
 
 # 8. FINAL CONFIGURATIONS AND TESTS
 
