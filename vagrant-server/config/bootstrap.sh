@@ -164,68 +164,70 @@ echo "miguel" >> /etc/vsftpd.userlist
 echo " 4.8 Restarting vsftpd "
 systemctl restart vsftpd
 
-
-# 5. Configure NGINX Service
-
-echo " Configuring Nginx Web Server "
-
-# 5.1 Create website folders
+# 5. CONFIGURE NGINX 
 WEB_ROOT="/var/www/$WEB_HOSTNAME/html"
 mkdir -p $WEB_ROOT
-
-# 5.2 Clone the repository
-echo " Cloning website repository... "
-rm -rf /tmp/website_repo
-git clone https://github.com/cloudacademy/static-website-example /tmp/website_repo
-cp -r /tmp/website_repo/* $WEB_ROOT/
-rm -rf /tmp/website_repo
-
-# 5.3 Set Permissions (www-data user)
+rm -rf /tmp/repo
+git clone https://github.com/cloudacademy/static-website-example /tmp/repo
+cp -r /tmp/repo/* $WEB_ROOT/
+rm -rf /tmp/repo
 chown -R www-data:www-data /var/www/$WEB_HOSTNAME
 chmod -R 755 /var/www/$WEB_HOSTNAME
 
-# 5.4 Configure Server Block
+
+echo -n "mario:" > /etc/nginx/.htpasswd
+openssl passwd -apr1 'mario' >> /etc/nginx/.htpasswd
+echo -n "alejandra:" >> /etc/nginx/.htpasswd
+openssl passwd -apr1 'alejandra' >> /etc/nginx/.htpasswd
+chown www-data:www-data /etc/nginx/.htpasswd
+chmod 640 /etc/nginx/.htpasswd
+
+
 cat > /etc/nginx/sites-available/$WEB_HOSTNAME <<EOF
 server {
     listen 80;
     listen [::]:80;
-
     root $WEB_ROOT;
-    index index.html index.htm index.nginx-debian.html;
-
+    index index.html index.htm;
     server_name $WEB_HOSTNAME;
 
     location / {
+        satisfy all;
+
+        allow 192.168.56.1;     
+        allow 127.0.0.1;        
+        deny all;               
+
+        auth_basic "Restricted Area";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
         try_files \$uri \$uri/ =404;
     }
 }
 EOF
 
-# 5.5 Enable the site
 ln -sf /etc/nginx/sites-available/$WEB_HOSTNAME /etc/nginx/sites-enabled/
-
-# Disable default site
 rm -f /etc/nginx/sites-enabled/default
-
-# 5.6 Restart Nginx
 systemctl restart nginx
 
-# 6. FINAL CONFIGURATIONS AND TESTS
+
+# 8. FINAL CONFIGURATIONS AND TESTS
 
 echo " Checking services "
 systemctl status bind9 --no-pager
 systemctl status vsftpd --no-pager
 systemctl status nginx --no-pager
+ufw status verbose
 
 echo " Checking ports "
 ss -tlpn | grep ":53"
 ss -tlpn | grep ":21"
 ss -tlpn | grep ":80"
+ss -tlpn | grep ":443"
 
 echo " Testing DNS "
 dig @127.0.0.1 $NS_HOSTNAME +short
-dig @127.0.0.1 $FTP_CNAME +short
 dig @127.0.0.1 $WEB_HOSTNAME +short
-dig @127.0.0.1 -x $SERVER_IP +short
+dig @127.0.0.1 $DOCKER_HOSTNAME +short
 
 echo " Provisioning Completed Successfully "
