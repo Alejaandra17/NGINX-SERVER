@@ -158,6 +158,204 @@ sudo nano /var/log/nginx/error.log
 
 -------
 
+# 7. Implementing Security (Auth & SSL)
+
+## 7.1 Necessary Packages
+
+For this practice, we can use the OpenSSL tool to create the passwords. 
+First, we need to check if the package is installed:
+
+```Bash
+dpkg -l | grep openssl
+```
+
+## 7.2 Creating Users and Passwords for Web Access
+
+We will create a file named `.htpasswd` on your host machine within your website's configuration structure.
+
+### 7.2.1 Add the first user
+
+Create the file and add the username
+
+```Bash
+mario:
+```
+
+Generate the encrypted password using the Docker container and append it to the file:
+
+![alt text](assets/image-9.jpg)
+
+The file should look similar to this (each user on a separate line):
+
+```Bash
+Mario:$apr1$p8GCWcjP$C2bCXndx2BDzW/cK4nxxO.
+```
+
+This process can be repeated for as many users as needed.
+
+---
+
+# 8. Configure the Nginx container to use basic authentication
+
+We will edit the Nginx configuration file. If we didn't have one created yet, we could extract the default configuration file from the image to edit it using the following command:
+
+```Bash
+docker run --rm --entrypoint=cat nginx /etc/nginx/conf.d/default.conf > ./config/conf/nginx.conf
+```
+
+We will edit the file `./config/conf/nginx.conf`:
+
+```Bash
+nano ./config/conf/nginx.conf
+```
+
+We must decide which resources will be protected. Nginx allows adding restrictions at the server level or in a specific location (directory or file).
+
+We will use the `auth_basic` directive inside the `location` block and assign it the name of our domain, which will be shown to the user when requesting credentials. Finally, we configure Nginx to use the file we previously created using the `auth_basic_user_file directive`.
+
+```bash
+server {
+    listen 80;
+    listen [::]:80;
+    
+    root /var/www/%%WEB_HOSTNAME%%/html;
+    
+    index index.html index.htm index.nginx-debian.html;
+    
+    server_name %%WEB_HOSTNAME%%;
+    
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
+```
+Once the configuration is finished, we restart the service so that our access policy is applied.
+
+```Bash
+sudo systemctl restart nginx
+```
+---
+
+# 9. Combination of basic authentication with IP access restriction
+
+HTTP Basic Authentication can be effectively combined with IP address restrictions. In our configuration, we have implemented the most secure scenario where a user must satisfy both conditions simultaneously: they must connect from a valid IP AND be authenticated with a username and password.
+
+We applied this to the root location (`/`), meaning the entire website is protected.
+
+```Bash
+location / {
+        satisfy all;
+
+        allow 192.168.56.1;     
+        allow 127.0.0.1;        
+        deny all;               
+
+        auth_basic "Restricted Area SSL";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        try_files \$uri \$uri/ =404;
+    }
+```
+
+Explanation of Directives:
+
+1.`satisfy all;`
+
+· This directive tells Nginx that the client must satisfy all access phases.
+
+· Condition 1: The client's IP must be allowed by the access rules.
+
+· Condition 2: The client must successfully log in with a valid user/password.
+
+· If the directive were set to `any`, satisfying just one condition (e.g., having a valid IP) would bypass the password prompt, but we enforce all for maximum security.
+
+2.IP Access Control Rules: Nginx applies these rules in the order they appear in the file.
+
+· `deny 192.168.1.2;`: Explicitly blocks this specific IP address first. If a request comes from here, it is rejected immediately.
+
+· `allow 172.16.0.0/12;`: Allows traffic from the Docker internal network range.
+
+· `allow 127.0.0.1;`: Allows traffic from Localhost (the container itself or local checks).
+
+· `allow 192.168.56.1;`: Allows traffic from the Host machine (typically the VirtualBox/Vagrant adapter IP).
+
+3.Authentication:
+
+· `auth_basic ...`: Defines the realm name displayed to the user ("Restricted Secure Area").
+
+· `auth_basic_user_file ...`: Points to the .htpasswd file containing the valid encrypted credentials.
+
+---
+
+# 10. Firewall Configuration
+
+If we don’t have a firewall installed, we will use ufw
+
+```bash
+$ sudo apt install ufw
+```
+
+We will check if the firewall is active and which profiles are enabled.
+
+```bash
+$ sudo ufw status
+```
+
+We will activate the profile to allow HTTPS traffic
+
+```bash
+$ sudo ufw allow ssh 
+$ sudo ufw allow Nginx Full
+$ sudo ufw delete allow Nginx HTTP
+```
+
+---
+
+ # 11. SSL certificate configuration
+
+ The certificate will store basic information about the website, and it will be accompanied by a private key file that allows the server to handle encrypted data sent to it.
+
+We will create the SSL key and the certificate using the OpenSSL command.
+
+```bash
+sudo openssl req -x509 -nodes -days 365 \ 
+  -newkey rsa:2048 -keyout ./config/certs/server.key \ 
+  -out ./config/certs/server.crt \
+  -subj "/CN=nginx.ieszaidinvergeles"
+```
+
+We will add the use of an SSL certificate to the configuration of our site:
+
+```bash
+server {
+    listen 80;
+    listen 443 ssl;
+
+    root $WEB_ROOT;
+    index index.html index.htm index.nginx-debian.html;
+    server_name $WEB_HOSTNAME;
+
+    ssl_certificate /etc/ssl/certs/$WEB_HOSTNAME.crt;
+    ssl_certificate_key /etc/ssl/private/$WEB_HOSTNAME.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    location / {
+        satisfy all;
+
+        allow 192.168.56.1;     
+        allow 127.0.0.1;        
+        deny all;               
+
+        auth_basic "Restricted Area SSL";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        try_files \$uri \$uri/ =404;
+    }
+}
+```
+---
+
 # Installation and Configuration of Nginx Web Server with Docker
 
 Author: Alejandra Fernández López & Mario Acosta Vargas
@@ -430,6 +628,230 @@ Docker Compose simplifies the management of the service:
 View Logs (Real-time): `docker-compose logs -f`
 
 Stop Containers: `docker-compose down`
+
+---
+
+# 9. Implementing Security (Auth & SSL)
+
+We have implemented a dual-layer security system involving Basic Authentication and SSL encryption.
+
+## 9.1 Necessary Packages
+
+For this practice, we will use OpenSSL utilities to generate encrypted passwords. These utilities are readily available in the `stakater/ssl-certs-generator` Docker container, so we don't need to install anything on the host machine.
+
+Download the image on your host machine:
+
+```Bash
+docker pull stakater/ssl-certs-generator
+```
+
+## 9.2 Creating Users and Passwords for Web Access
+
+We will create a file named `.htpasswd` on your host machine within your website's configuration structure.
+
+### 9.2.1 Add the first user
+
+Create the file and add the username
+
+```Bash
+mario:
+```
+
+Generate the encrypted password using the Docker container and append it to the file:
+
+![alt text](assets/image-9.jpg)
+
+The file should look similar to this (each user on a separate line):
+
+```Bash
+Mario:$apr1$p8GCWcjP$C2bCXndx2BDzW/cK4nxxO.
+```
+
+This process can be repeated for as many users as needed.
+
+---
+
+# 10. Configure the Nginx container to use basic authentication
+
+We will edit the Nginx configuration file. If we didn't have one created yet, we could extract the default configuration file from the image to edit it using the following command:
+
+```Bash
+docker run --rm --entrypoint=cat nginx /etc/nginx/conf.d/default.conf > ./config/conf/nginx.conf
+```
+
+We will edit the file `./config/conf/nginx.conf`:
+
+```Bash
+nano ./config/conf/nginx.conf
+```
+
+We must decide which resources will be protected. Nginx allows adding restrictions at the server level or in a specific location (directory or file).
+
+We will use the `auth_basic` directive inside the `location` block and assign it the name of our domain, which will be shown to the user when requesting credentials. Finally, we configure Nginx to use the file we previously created using the `auth_basic_user_file directive`.
+
+```bash
+server {
+  listen 80;
+  listen [::]:80;
+  listen 443 ssl;
+  root /usr/share/nginx/html; 
+  index index.html index.htm index.nginx-debian.html;
+  server_name nginx.ieszaidinvergeles;
+    
+    location / {
+        satisfy all;
+
+        deny 192.168.1.2;     
+        allow 172.16.0.0/12;   
+        allow 127.0.0.1;       
+        allow 192.168.56.1;   
+                
+        auth_basic "Restricted Secure Area";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        try_files $uri $uri/ =404;
+    }
+}
+```
+
+Now, we run the container with the updated volume mappings to include the password file:
+
+```Bash
+docker run -d \
+  --name $CONTAINER_NAME \
+  -p $HOST_PORT:80 \
+  -p $HTTPS_PORT:443 \
+  -v "$(pwd)/config/html":/usr/share/nginx/html \
+  -v "$(pwd)/config/conf/nginx.conf":/etc/nginx/conf.d/default.conf \
+  -v "$(pwd)/config/conf/.htpasswd":/etc/nginx/.htpasswd \
+  nginx:latest
+```
+---
+
+# 11. Combination of basic authentication with IP access restriction
+
+HTTP Basic Authentication can be effectively combined with IP address restrictions. In our configuration, we have implemented the most secure scenario where a user must satisfy both conditions simultaneously: they must connect from a valid IP AND be authenticated with a username and password.
+
+We applied this to the root location (`/`), meaning the entire website is protected.
+
+```Bash
+location / {
+        satisfy all;
+
+        deny 192.168.1.2;     
+        allow 172.16.0.0/12;   
+        allow 127.0.0.1;       
+        allow 192.168.56.1;   
+                
+        auth_basic "Restricted Secure Area";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        try_files $uri $uri/ =404;
+    }
+```
+
+Explanation of Directives:
+
+1.`satisfy all;`
+
+· This directive tells Nginx that the client must satisfy all access phases.
+
+· Condition 1: The client's IP must be allowed by the access rules.
+
+· Condition 2: The client must successfully log in with a valid user/password.
+
+· If the directive were set to `any`, satisfying just one condition (e.g., having a valid IP) would bypass the password prompt, but we enforce all for maximum security.
+
+2.IP Access Control Rules: Nginx applies these rules in the order they appear in the file.
+
+· `deny 192.168.1.2;`: Explicitly blocks this specific IP address first. If a request comes from here, it is rejected immediately.
+
+· `allow 172.16.0.0/12;`: Allows traffic from the Docker internal network range.
+
+· `allow 127.0.0.1;`: Allows traffic from Localhost (the container itself or local checks).
+
+· `allow 192.168.56.1;`: Allows traffic from the Host machine (typically the VirtualBox/Vagrant adapter IP).
+
+3.Authentication:
+
+· `auth_basic ...`: Defines the realm name displayed to the user ("Restricted Secure Area").
+
+· `auth_basic_user_file ...`: Points to the .htpasswd file containing the valid encrypted credentials.
+
+---
+
+# 12. SSL certificate configuration
+
+We will add the use of an SSL certificate to our site’s configuration.
+
+```bash
+server {
+  listen 80;
+  listen [::]:80;
+  listen 443 ssl;
+  root /usr/share/nginx/html; 
+  index index.html index.htm index.nginx-debian.html;
+  server_name nginx.ieszaidinvergeles;
+
+    ssl_certificate /etc/ssl/certs/server.crt;
+    ssl_certificate_key /etc/ssl/certs/server.key;
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    
+    location / {
+        satisfy all;
+
+        deny 192.168.1.2;     
+        allow 172.16.0.0/12;   
+        allow 127.0.0.1;       
+        allow 192.168.56.1;   
+                
+        auth_basic "Restricted Secure Area";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        try_files $uri $uri/ =404;
+    }
+}
+```
+---
+
+# 13. Port mapping and volume mounting with certificates
+
+· We will map ports 80 and 443 to access the web service.
+
+· We will mount the certificates via a bind mount at the path specified in the configuration.
+
+```bash
+version: '3.8'
+
+services:
+  nginx-custom:
+    build: .
+    image: my-custom-nginx-image
+    container_name: nginx-compose-version
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./config/html:/usr/share/nginx/html
+      - ./config/conf/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./config/conf/.htpasswd:/etc/nginx/.htpasswd
+      - ./config/certs:/etc/ssl/certs
+    restart: unless-stopped
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
